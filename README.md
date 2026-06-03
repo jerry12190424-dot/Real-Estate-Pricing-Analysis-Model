@@ -2,13 +2,13 @@
 
 > A Quantitative Approach to Spatial Mispricing and Alpha Generation in Real Estate Markets.
 
-## 1. 📌 Project Vision (專案願景)
+## 1. Project Vision (專案願景)
 本專案為一個「不動產自動估價與超額價值尋找系統」的 Proof of Concept (POC)。
 在量化研究的框架下，本系統不旨在預測絕對價格，而是透過**區域中性化 (Cross-sectional Neutralization)** 處理，尋找在空間橫截面上開價異常偏低、具備潛在套利空間的「錯殺/被低估物件 (Underpriced Assets)」。
 
 ---
 
-## 2. ⚙️ Core Methodology (核心量化邏輯)
+## 2. Core Methodology (核心量化邏輯)
 
 ### 2.1 資料工程與防呆過濾 (Data Engineering)
 * **Dataset:** 處理 2023-2026Q1 超過 144 萬筆開價數據。
@@ -30,7 +30,7 @@
 
 ---
 
-## 3. 📈 Model Interpretability (模型解釋性)
+## 3. Model Interpretability (模型解釋性)
 專案內建 **SHAP (SHapley Additive exPlanations)** 事後解釋模組。從 SHAP Summary Plot 的特徵歸因分析中，特徵歸因結果與實務市場定價邏輯具備高度一致性：
 
 1. **車位坪數稀釋效應 (Dilution Effect):** 車位屬性對「單價 Target」產生穩定的負向 SHAP 貢獻，模型成功學習到車位坪數會拉低整體平均單價的數學關係。
@@ -38,7 +38,7 @@
 
 ---
 
-## 4. 🧭 Future Engineering Roadmap (未來優化藍圖)
+## 4. Future Engineering Roadmap (未來優化藍圖)
 目前的 MVP 證明了此機器學習框架能有效在空間橫截面上尋找錯價 (Mispricing)。為符合真實量化交易與精準估價的生產環境 (Production Environment) 標準，下一階段優化將著重於以下五個工程維度：
 
 ### 4.1 流動性風險與去化門檻 (Liquidity & Turnover Constraints)

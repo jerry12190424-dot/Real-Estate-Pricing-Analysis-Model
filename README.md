@@ -1,23 +1,23 @@
 # Real-Estate Pricing Anomaly Detection Model
 
-
 ## 1. Problem Statement
 本專案旨在建立一個不動產相對定價模型。相較於預測絕對房價，本研究聚焦於尋找「空間橫截面上的定價異常 (Pricing Anomalies)」。透過建立區域中性化 (Regional Neutralization) 的基準，過濾大盤漲跌趨勢，試圖從非結構化的開價數據中，篩選出具備潛在低估空間的物件訊號 (Candidate Screening Signal)。
 
 ## 2. Dataset
-研究資料來源：內政部實價登錄、實價登錄比價王（爬蟲）
+* **訓練特徵與開價數據:** 實價登錄比價王（爬蟲），共計約 144 萬筆。
+* **事後收斂驗證基準:** 內政部不動產交易實價登錄。
 
 ## 3. Methodology
 * **Data Engineering:** 針對 144 萬筆資料實作 Winsorization (首尾 1% 極端值截斷) 以降低離群值對模型的擾動；空間座標 (x, y) 缺失值採 `groupby(['dist', 'road'])` 階層式均值填補。
 * **Target Formulation:** 為消除行政區本身的絕對地段價值差異，建立相對折溢價指標：
   `Target = Listing_Unit_Price / District_Quarter_Listing_Mean` 
-  *(註：此 Target 定義目前僅供 Offline Research 使用。因預測當下無法取得完整的當季均價，尚不適用於 Live Inference，詳見 Limitations)*
+  *(註：此 Target 定義目前僅供 Offline Research 使用。因預測當下無法取得完整的當季均價，尚不適用於 Live Inference，詳見 Roadmap)*
 * **Model Selection:** 採用 LightGBM 迴歸模型。其基於 Histogram 的決策樹架構能有效切割二維地理座標 (Lat, Lon)，捕捉非線性的空間溢價特徵。
 
 ## 4. Validation Design
 為盡可能模擬真實推論環境 (Live Inference) 並減少時間洩漏 (Temporal Leakage)，本專案捨棄隨機切分 (Random Split)，採用嚴格的 Chronological Split：
 * **Train Set:** 2023 - 2024
-* **Validation Set:** 2025 
+* **Validation Set:** 2025 (For Early Stopping 防止過擬合)
 * **Test Set:** 2026Q1 (Out-of-sample 盲測)
 
 ## 5. Results & Ablation Study (2026Q1 Test Set)
@@ -46,10 +46,16 @@
 3. **另類空間數據擴展 (Alternative Spatial Data):** 透過 API 整合外部地理矩陣，將「大眾運輸樞紐距離」、「日照幾何角度」及「嫌惡設施分佈範圍」等非傳統特徵量化為新的 Alpha Factors。
 4. **總體經濟與跨市場因子 (Macro & Cross-Market Factors):** 納入台股大盤波動率、資金流向比例等跨市場資金動能，並將央行信用管制 (LTV Limits) 等宏觀法規進行量化編碼，提升模型面對結構性轉折 (Structural Breaks) 時的預測韌性。
 
+---
+
+## 8. Reproducibility
+
 ### Repo Structure
 ```text
 .
 ├── data/
-│   └── sample_data.csv        # data example
-├── estate_model.py            # 資料清理、訓練與評估 Pipeline
+│   └── sample_data.csv        # Data schema example (100 rows)
+├── images/
+│   └── shap_summary.png       # SHAP interpretation chart
+├── estate_model.py            # 資料處理、模型訓練與評估 Pipeline
 └── README.md

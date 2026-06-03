@@ -1,4 +1,4 @@
-# 🏢 Real-Estate-Pricing-Analysis-Model
+# Real-Estate-Pricing-Analysis-Model
 
 > A Quantitative Approach to Spatial Mispricing and Alpha Generation in Real Estate Markets.
 

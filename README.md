@@ -4,8 +4,7 @@
 本專案旨在建立一個不動產相對定價模型。相較於預測絕對房價，本研究聚焦於尋找「空間橫截面上的定價異常 (Pricing Anomalies)」。透過建立區域中性化 (Regional Neutralization) 的基準，過濾大盤漲跌趨勢，試圖從非結構化的開價數據中，篩選出具備潛在低估空間的物件訊號 (Candidate Screening Signal)。
 
 ## 2. Dataset
-* **訓練特徵與開價數據:** 實價登錄比價王（爬蟲），共計約 144 萬筆。
-* **事後收斂驗證基準:** 內政部不動產交易實價登錄。
+* **資料來源：內政部交易實價登錄、bigfun比房網。
 
 ## 3. Methodology
 * **Data Engineering:** 針對 144 萬筆資料實作 Winsorization (首尾 1% 極端值截斷) 以降低離群值對模型的擾動；空間座標 (x, y) 缺失值採 `groupby(['dist', 'road'])` 階層式均值填補。

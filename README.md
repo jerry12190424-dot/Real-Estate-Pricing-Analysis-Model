@@ -1,58 +1,55 @@
-# Real-Estate-Pricing-Analysis-Model
+# Real-Estate Pricing Anomaly Detection Model
 
-> A Quantitative Approach to Spatial Mispricing and Alpha Generation in Real Estate Markets.
 
-## 1. Project Vision (專案願景)
-本專案為一個「不動產自動估價與超額價值尋找系統」的 Proof of Concept (POC)。
-在量化研究的框架下，本系統不旨在預測絕對價格，而是透過**區域中性化 (Cross-sectional Neutralization)** 處理，尋找在空間橫截面上開價異常偏低、具備潛在套利空間的「錯殺/被低估物件 (Underpriced Assets)」。
+## 1. Problem Statement
+本專案旨在建立一個不動產相對定價模型。相較於預測絕對房價，本研究聚焦於尋找「空間橫截面上的定價異常 (Pricing Anomalies)」。透過建立區域中性化 (Regional Neutralization) 的基準，過濾大盤漲跌趨勢，試圖從非結構化的開價數據中，篩選出具備潛在低估空間的物件訊號 (Candidate Screening Signal)。
 
----
+## 2. Dataset
+研究資料來源：內政部實價登錄、實價登錄比價王（爬蟲）
 
-## 2. Core Methodology (核心量化邏輯)
+## 3. Methodology
+* **Data Engineering:** 針對 144 萬筆資料實作 Winsorization (首尾 1% 極端值截斷) 以降低離群值對模型的擾動；空間座標 (x, y) 缺失值採 `groupby(['dist', 'road'])` 階層式均值填補。
+* **Target Formulation:** 為消除行政區本身的絕對地段價值差異，建立相對折溢價指標：
+  `Target = Listing_Unit_Price / District_Quarter_Listing_Mean` 
+  *(註：此 Target 定義目前僅供 Offline Research 使用。因預測當下無法取得完整的當季均價，尚不適用於 Live Inference，詳見 Limitations)*
+* **Model Selection:** 採用 LightGBM 迴歸模型。其基於 Histogram 的決策樹架構能有效切割二維地理座標 (Lat, Lon)，捕捉非線性的空間溢價特徵。
 
-### 2.1 資料工程與防呆過濾 (Data Engineering)
-* **Dataset:** 處理 2023-2026Q1 超過 144 萬筆開價數據。
-* **Winsorization:** 實作首尾 1% 極端值截斷，排除離群值雜訊。
-* **Imputation:** 針對空間座標 $(x, y)$ 缺失值，建立 `groupby(['dist', 'road'])` 的階層式均值填補機制。
+## 4. Validation Design
+為盡可能模擬真實推論環境 (Live Inference) 並減少時間洩漏 (Temporal Leakage)，本專案捨棄隨機切分 (Random Split)，採用嚴格的 Chronological Split：
+* **Train Set:** 2023 - 2024
+* **Validation Set:** 2025 
+* **Test Set:** 2026Q1 (Out-of-sample 盲測)
 
-### 2.2 Alpha Target 建構 (Target Formulation)
-放棄直接預測絕對房價，改以建立相對折溢價指標 (Relative Premium/Discount)。
-強制模型學習物件在該行政區內的相對價值關係，數學抽象化為：
-`Target = Actual_Unit_Price / E[Unit_Price | District, Quarter]`
+## 5. Results & Ablation Study (2026Q1 Test Set)
+在未見的 2026Q1 測試集中，我們進行了特徵消融實驗 (Ablation Study) 與模型橫向比較。結果顯示，LightGBM 在加入正交特徵後，展現出較低的 Test MSE 與較高的 Out-of-sample $R^2$，效能優於線性迴歸與區域均值基準模型：
 
-### 2.3 演算法架構 (Algorithm Selection)
-採用基於決策樹的梯度提升框架 (**LightGBM**)。其原生的高效能節點分裂 (Node Splitting)，能有效處理二維地理座標 (Longitude, Latitude) 上的正交切割，顯著捕捉地段空間溢價等高度非線性 (Non-linear) 特徵。
+| Model | Feature Strategy (特徵策略) | Test MSE | Test R-squared | Notes |
+|:---|:---|:---:|:---:|:---|
+| Null Baseline | Baseline (District Mean) | 0.1109 | -0.0002 | 基準線 (猜平均) |
+| Ridge (Linear) | Basic Features (OHE dist) | 0.1047 | 0.0559 | 線性對照組 |
+| LightGBM | Model A (無坪數特徵) | 0.0602 | 0.4612 | 基於空間地理特徵 |
+| LightGBM | + Efficiency_Ratio (得房率) | 0.0542 | 0.5144 | 捕捉公設比之隱藏定價 |
+| LightGBM | + Size (總坪數) | 0.0524 | 0.5310 | 捕捉規模折價效應 |
+| **LightGBM (Proposed)** | **+ Size + Efficiency_Ratio** | **0.0503** | **0.5500** | **雙重特徵組合 (主力模型)** |
+| Random Forest | + Size + Efficiency_Ratio (OHE) | 0.0502 | 0.5505 | 樹狀模型驗證對照 |
 
-### 2.4 時間序列外推驗證 (Out-of-sample Validation)
-摒棄傳統機器學習的隨機切分 (Random Split) 以絕對避免 Data Leakage。採用嚴格的**時間外推切割 (Temporal Split)**：
-* `Train/Val Set`: 2023-2025 (Out-of-bag validation for Early Stopping)
-* `Test Set`: 2026Q1 (真實模擬量化回測與未來推論情境)
+## 6. Interpretability (SHAP Analysis)
+透過 SHAP 進行特徵歸因，觀察模型是否學習到符合市場直覺的定價邏輯：
+1. **車位稀釋效應:** 車位特徵對「單價 Target」產生穩定的負向 SHAP 值，符合車位坪數拉低整體均價的數學特性。
+2. **非線性屋齡特徵:** 模型顯示屋齡與價值間存在 U 型關係。在特定精華地段，極高屋齡物件獲得正向 SHAP 貢獻，**此現象暗示模型可能捕捉到了與都市更新 (Urban Renewal) 直覺一致的潛在溢價**，而非單純的線性折舊。
 
----
+## 7. Future Engineering Roadmap (未來優化藍圖)
+本 POC 在空間橫截面上已初步驗證定價異常 (Pricing Anomalies) 的捕捉能力。為推進至具備實戰價值的量化篩選系統，後續優化將聚焦於以下四個維度：
 
-## 3. Model Interpretability (模型解釋性)
-專案內建 **SHAP (SHapley Additive exPlanations)** 事後解釋模組。從 SHAP Summary Plot 的特徵歸因分析中，特徵歸因結果與實務市場定價邏輯具備高度一致性：
+1. **消除未來數據引用 (Look-ahead Bias Mitigation):** 目前 Target 採用「當季均價」進行中性化。實務 Live Inference 時，將改採 **「上一季區域均價 (Lagged Quarterly Mean)」** 作為分母基準，徹底消除 Look-ahead Bias；並建立 Property ID 追蹤邏輯，過濾重複上架之物件以確保樣本獨立性。
+2. **流動性與去化門檻 (Liquidity Constraints):** 不動產屬低頻交易資產，缺乏流動性的低估物件無變現價值。未來將結合歷史週轉率 (Turnover Rate) 設定流動性過濾機制，萃取出兼具「價格 Alpha」與「交易可行性」的標的。
+3. **另類空間數據擴展 (Alternative Spatial Data):** 透過 API 整合外部地理矩陣，將「大眾運輸樞紐距離」、「日照幾何角度」及「嫌惡設施分佈範圍」等非傳統特徵量化為新的 Alpha Factors。
+4. **總體經濟與跨市場因子 (Macro & Cross-Market Factors):** 納入台股大盤波動率、資金流向比例等跨市場資金動能，並將央行信用管制 (LTV Limits) 等宏觀法規進行量化編碼，提升模型面對結構性轉折 (Structural Breaks) 時的預測韌性。
 
-1. **車位坪數稀釋效應 (Dilution Effect):** 車位屬性對「單價 Target」產生穩定的負向 SHAP 貢獻，模型成功學習到車位坪數會拉低整體平均單價的數學關係。
-2. **老屋都更潛力溢價 (Urban Renewal Premium):** 模型發現在「屋齡 (Age)」與「價值」之間存在非線性 U 型關係。在特定高價值地段，極高屋齡的老屋反而獲得了正向的 SHAP 貢獻，證明模型自主挖掘出了潛在的改建與都市更新 (都更) 價值，而非單純的線性折舊。
-
----
-
-## 4. Future Engineering Roadmap (未來優化藍圖)
-目前的 MVP 證明了此機器學習框架能有效在空間橫截面上尋找錯價 (Mispricing)。為符合真實量化交易與精準估價的生產環境 (Production Environment) 標準，下一階段優化將著重於以下五個工程維度：
-
-### 4.1 流動性風險與去化門檻 (Liquidity & Turnover Constraints)
-在真實市場中，毫無流動性的資產即使被嚴重低估也無法變現。預測流程的最後一環將結合「熱銷物件過濾機制」，分析歷史週轉率 (Historical Turnover Rate) 並設定嚴格的**流動性門檻 (Liquidity Filter)**，萃取出兼具「價格 Alpha」與「高流動性」的真實可投資標的 (Actionable Investment Universe)。
-
-### 4.2 消除未來數據引用 (Look-ahead Bias Mitigation)
-* **Lagged Neutralization:** 目前 MVP 採用「當季均價」進行中性化。實務 Live Inference 時，將改採 **上一季的區域均價 (Lagged Quarterly Mean)** 作為分母基準，徹底消除 Look-ahead Bias。
-* **Listing Deduplication:** 建立物件追蹤碼 (Property ID tracking) 邏輯，過濾重複上架/降價的同一物件，確保時間序列樣本的獨立性。
-
-### 4.3 另類地理與環境數據 (Alternative Spatial Data)
-透過 API 整合更細緻的外部地理空間矩陣 (Spatial Matrices)。例如：量化「大眾運輸樞紐距離」、「採光與日照幾何角度」，以及「嫌惡設施/凶宅分佈範圍」作為新的 **Alpha Factors**，捕捉傳統定價網站忽略的隱含折溢價。
-
-### 4.4 跨市場資金動能 (Cross-Market Capital Flows)
-導入跨市場資金動能因子（如：台股大盤指數波動率、M2 貨幣供給、股市與房地產資金流向比例等），從總體經濟 (Macro) 維度捕捉市場的真實熱度與買盤溢出效應 (Spillover Effect)。
-
-### 4.5 總體政策與法規因子 (Macro Policy Factors)
-將央行信用管制 (如 LTV Limits 貸款成數上限)、稅制變動 (如房地合一稅) 及利率決策等宏觀變數進行量化編碼 (Quantitative Encoding)，提升模型在面對市場結構性轉折 (Structural Breaks) 時的預測韌性。
+### Repo Structure
+```text
+.
+├── data/
+│   └── sample_data.csv        # data example
+├── estate_model.py            # 資料清理、訓練與評估 Pipeline
+└── README.md

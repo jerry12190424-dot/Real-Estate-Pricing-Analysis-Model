@@ -1,32 +1,58 @@
 # 🏢 Real-Estate-Pricing-Analysis-Model
 
-## 📌 Project Vision (專案願景)
+> A Quantitative Approach to Spatial Mispricing and Alpha Generation in Real Estate Markets.
+
+## 1. 📌 Project Vision (專案願景)
 本專案為一個「不動產自動估價與超額價值尋找系統」的 Proof of Concept (POC)。
-在量化研究的框架下，本模型不單純預測絕對價格，而是透過**區域中性化 (Cross-sectional Neutralization)** 處理，尋找在橫截面上開價異常偏低、具備潛在套利空間的「錯殺/被低估物件 (Underpriced Assets)」。
-
-## ⚙️ Core Methodology (核心量化邏輯)
-* **資料工程與極端值處理:** 處理 2023-2026Q1 超過 144 萬筆開價數據。實作 Winsorization (首尾 1% 極端值截斷) 與防呆過濾機制，並處理空間座標 (x, y) 缺失值。
-* **Alpha Target 建構:** 放棄直接預測絕對房價，改以 `實際開價 / 區域季均價` 作為預測目標 (Target)，強制模型學習物件在該行政區內的相對折溢價關係。
-* **演算法選型 (LightGBM):** 採用基於決策樹的梯度提升框架。其原生的高效能節點分裂，能完美在二維地理座標 (Longitude, Latitude) 上進行正交切割，精準捕捉複雜的「地段空間溢價」等非線性特徵。
-* **嚴謹的時間序列驗證 (Out-of-sample Split):** 摒棄傳統的隨機切分 (Random Split) 以避免 Data Leakage。採用嚴格的時間外推測試 (Train: 2023-2025, Test: 2026Q1)，最真實地模擬量化回測環境。
-
-## 📈 Model Interpretability (模型解釋性)
-專案內建 SHAP (SHapley Additive exPlanations) 事後解釋模組。從 SHAP Summary Plot 中可驗證模型的決策邏輯完全符合真實市場直覺（例如：車位屬性對「單價」產生精準的負向 SHAP 貢獻，捕捉了車位坪數稀釋單價的現象）。
+在量化研究的框架下，本系統不旨在預測絕對價格，而是透過**區域中性化 (Cross-sectional Neutralization)** 處理，尋找在空間橫截面上開價異常偏低、具備潛在套利空間的「錯殺/被低估物件 (Underpriced Assets)」。
 
 ---
 
-## 🧭 Engineering Reflections & Future Roadmap (工程檢討與未來優化)
-目前的 MVP 證明了此機器學習框架能有效在空間橫截面上尋找錯價。為符合真實量化交易與精準估價的生產環境 (Production Environment) 標準，下一步優化將著重於以下四個維度：
+## 2. ⚙️ Core Methodology (核心量化邏輯)
 
-### 1. 消除未來數據引用與樣本偏差 (Data Leakage & Bias Mitigation)
-* **相對定價基準遞延 (Lagged Neutralization):** 目前的 Target 採用「當季均價」進行中性化。實務上在 Live Inference 時，當季均價尚未發生。未來將改採 **上一季的區域均價 (Lagged Quarterly Mean)** 作為比較基準，徹底消除 Look-ahead Bias。
-* **重複物件過濾 (Listing Deduplication):** 同一實體物件可能在不同時間點重複上架、降價求售。未來將建立物件追蹤碼 (Property ID tracking) 邏輯，確保時間序列樣本的獨立性，避免模型對特定滯銷物件產生過度擬合 (Overfitting)。
+### 2.1 資料工程與防呆過濾 (Data Engineering)
+* **Dataset:** 處理 2023-2026Q1 超過 144 萬筆開價數據。
+* **Winsorization:** 實作首尾 1% 極端值截斷，排除離群值雜訊。
+* **Imputation:** 針對空間座標 $(x, y)$ 缺失值，建立 `groupby(['dist', 'road'])` 的階層式均值填補機制。
 
-### 2. 另類地理與環境數據擴展 (Alternative Spatial Data)
-放棄單純依賴傳統房市開價與格局特徵，計畫透過 API 或爬蟲整合更細緻的外部地理與環境資訊。例如：將「大眾運輸樞紐距離 (交通)」、「採光與日照角度幾何模型」，甚至「嫌惡設施與凶宅分佈」量化為新的 **Alpha Factors**，捕捉傳統定價網站忽略的隱含價值與流動性折價。
+### 2.2 Alpha Target 建構 (Target Formulation)
+放棄直接預測絕對房價，改以建立相對折溢價指標 (Relative Premium/Discount)。
+強制模型學習物件在該行政區內的相對價值關係，數學抽象化為：
+`Target = Actual_Unit_Price / E[Unit_Price | District, Quarter]`
 
-### 3. 跨市場資金動能與熱度指標 (Cross-Market Capital Flows)
-房地產價格深受總體經濟與游資溢出效應 (Spillover Effect) 的影響。未來模型將納入跨市場資金動能因子（例如：台股大盤指數波動、資金流向股市與房地產的相對比例、M2 貨幣供給量等），從宏觀維度掌握市場的真實熱度與買盤動能。
+### 2.3 演算法架構 (Algorithm Selection)
+採用基於決策樹的梯度提升框架 (**LightGBM**)。其原生的高效能節點分裂 (Node Splitting)，能完美在二維地理座標 (Longitude, Latitude) 上進行正交切割，精準捕捉複雜的「地段空間溢價」等高度非線性 (Non-linear) 特徵。
 
-### 4. 總體政策與法規因子 (Macro Policy & Regulatory Factors)
-不動產是高度受政策調控的資產類別。未來計畫將央行信用管制 (如貸款成數上限 LTV Limits)、稅制改革 (如房地合一稅、囤房稅) 及利率決策等宏觀政策變數進行量化編碼。這能大幅提升模型在面對市場結構性轉折 (Structural Breaks) 時的預測韌性與準確度。
+### 2.4 時間序列外推驗證 (Out-of-sample Validation)
+摒棄傳統機器學習的隨機切分 (Random Split) 以絕對避免 Data Leakage。採用嚴格的**時間外推切割 (Temporal Split)**：
+* `Train/Val Set`: 2023-2025 (Out-of-bag validation for Early Stopping)
+* `Test Set`: 2026Q1 (真實模擬量化回測與未來推論情境)
+
+---
+
+## 3. 📈 Model Interpretability (模型解釋性)
+專案內建 **SHAP (SHapley Additive exPlanations)** 事後解釋模組。從 SHAP Summary Plot 的特徵歸因分析中，我們觀察到模型捕捉了極度符合真實金融與房地產市場邏輯的非線性特徵：
+
+1. **車位坪數稀釋效應 (Dilution Effect):** 車位屬性對「單價 Target」產生精準的負向 SHAP 貢獻，模型成功學習到車位坪數會拉低整體平均單價的數學關係。
+2. **老屋都更潛力溢價 (Urban Renewal Premium):** 模型發現在「屋齡 (Age)」與「價值」之間存在非線性 U 型關係。在特定高價值地段，極高屋齡的老屋反而獲得了正向的 SHAP 貢獻，證明模型自主挖掘出了潛在的改建與都市更新 (都更) 價值，而非單純的線性折舊。
+
+---
+
+## 4. 🧭 Future Engineering Roadmap (未來優化藍圖)
+目前的 MVP 證明了此機器學習框架能有效在空間橫截面上尋找錯價 (Mispricing)。為符合真實量化交易與精準估價的生產環境 (Production Environment) 標準，下一階段優化將著重於以下五個工程維度：
+
+### 4.1 流動性風險與去化門檻 (Liquidity & Turnover Constraints)
+在真實市場中，毫無流動性的資產即使被嚴重低估也無法變現。預測流程的最後一環將結合「熱銷物件過濾機制」，分析歷史週轉率 (Historical Turnover Rate) 並設定嚴格的**流動性門檻 (Liquidity Filter)**，萃取出兼具「價格 Alpha」與「高流動性」的真實可投資標的 (Actionable Investment Universe)。
+
+### 4.2 消除未來數據引用 (Look-ahead Bias Mitigation)
+* **Lagged Neutralization:** 目前 MVP 採用「當季均價」進行中性化。實務 Live Inference 時，將改採 **上一季的區域均價 (Lagged Quarterly Mean)** 作為分母基準，徹底消除 Look-ahead Bias。
+* **Listing Deduplication:** 建立物件追蹤碼 (Property ID tracking) 邏輯，過濾重複上架/降價的同一物件，確保時間序列樣本的獨立性。
+
+### 4.3 另類地理與環境數據 (Alternative Spatial Data)
+透過 API 整合更細緻的外部地理空間矩陣 (Spatial Matrices)。例如：量化「大眾運輸樞紐距離」、「採光與日照幾何角度」，以及「嫌惡設施/凶宅分佈範圍」作為新的 **Alpha Factors**，捕捉傳統定價網站忽略的隱含折溢價。
+
+### 4.4 跨市場資金動能 (Cross-Market Capital Flows)
+導入跨市場資金動能因子（如：台股大盤指數波動率、M2 貨幣供給、股市與房地產資金流向比例等），從總體經濟 (Macro) 維度捕捉市場的真實熱度與買盤溢出效應 (Spillover Effect)。
+
+### 4.5 總體政策與法規因子 (Macro Policy Factors)
+將央行信用管制 (如 LTV Limits 貸款成數上限)、稅制變動 (如房地合一稅) 及利率決策等宏觀變數進行量化編碼 (Quantitative Encoding)，提升模型在面對市場結構性轉折 (Structural Breaks) 時的預測韌性。

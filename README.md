@@ -21,7 +21,7 @@
 `Target = Actual_Unit_Price / E[Unit_Price | District, Quarter]`
 
 ### 2.3 演算法架構 (Algorithm Selection)
-採用基於決策樹的梯度提升框架 (**LightGBM**)。其原生的高效能節點分裂 (Node Splitting)，能完美在二維地理座標 (Longitude, Latitude) 上進行正交切割，精準捕捉複雜的「地段空間溢價」等高度非線性 (Non-linear) 特徵。
+採用基於決策樹的梯度提升框架 (**LightGBM**)。其原生的高效能節點分裂 (Node Splitting)，能有效處理二維地理座標 (Longitude, Latitude) 上的正交切割，顯著捕捉地段空間溢價等高度非線性 (Non-linear) 特徵。
 
 ### 2.4 時間序列外推驗證 (Out-of-sample Validation)
 摒棄傳統機器學習的隨機切分 (Random Split) 以絕對避免 Data Leakage。採用嚴格的**時間外推切割 (Temporal Split)**：
@@ -31,9 +31,9 @@
 ---
 
 ## 3. 📈 Model Interpretability (模型解釋性)
-專案內建 **SHAP (SHapley Additive exPlanations)** 事後解釋模組。從 SHAP Summary Plot 的特徵歸因分析中，我們觀察到模型捕捉了極度符合真實金融與房地產市場邏輯的非線性特徵：
+專案內建 **SHAP (SHapley Additive exPlanations)** 事後解釋模組。從 SHAP Summary Plot 的特徵歸因分析中，特徵歸因結果與實務市場定價邏輯具備高度一致性：
 
-1. **車位坪數稀釋效應 (Dilution Effect):** 車位屬性對「單價 Target」產生精準的負向 SHAP 貢獻，模型成功學習到車位坪數會拉低整體平均單價的數學關係。
+1. **車位坪數稀釋效應 (Dilution Effect):** 車位屬性對「單價 Target」產生穩定的負向 SHAP 貢獻，模型成功學習到車位坪數會拉低整體平均單價的數學關係。
 2. **老屋都更潛力溢價 (Urban Renewal Premium):** 模型發現在「屋齡 (Age)」與「價值」之間存在非線性 U 型關係。在特定高價值地段，極高屋齡的老屋反而獲得了正向的 SHAP 貢獻，證明模型自主挖掘出了潛在的改建與都市更新 (都更) 價值，而非單純的線性折舊。
 
 ---
